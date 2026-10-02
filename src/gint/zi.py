@@ -8,18 +8,24 @@ In mathematics, Gaussian integers and rationals are denoted by Z[i] & Q[i], resp
 So, here, Zi & Qi denote the Gaussian integer and rational classes, respectively.
 
 The classes support the arithmetic of Gaussian integers and rationals using the
-operators: +, -, *, /, //, %, **, +=, -=, *=, and /=, along with a variety of
+operators ``+``, ``-``, ``*``, ``/``, ``//``, ``%``, ``**``, ``+=``, ``-=``, ``*=``,
+and ``/=``, along with a variety of
 number-theoretic algorithms, such as greatest common divisor (gcd), an extended
 Euclidean algorithm (xgcd), etc.
 
-Example:
->>> from gint import Zi, Qi
->>>
->>> alpha = Zi(11, 3)
->>> beta = Zi(1, 8)
->>> a, x, y = Zi.xgcd(alpha, beta)
->>> print(f'{alpha * x + beta * y} = {alpha} * {x} + {beta} * {y}')
->>> # ==> (1-2j) = (11+3j) * (2-1j) + (1+8j) * 3j
+Example
+-------
+
+Find ``x`` and ``y`` such that ``alpha * x + beta * y`` is a greatest common
+divisor of ``alpha`` and ``beta`` (extended Euclidean algorithm):
+
+>>> from gint import Zi
+>>> alpha, beta = Zi(11, 3), Zi(1, 8)
+>>> g, x, y = Zi.xgcd(alpha, beta)
+>>> g, x, y
+(Zi(1, -2), Zi(2, -1), Zi(0, 3))
+>>> alpha * x + beta * y == g
+True
 """
 
 __author__ = "Alfred J. Reich, Ph.D."
@@ -600,17 +606,16 @@ class Zi(Complex):
 
         Method: factor the rational integer N(z) by trial division,
         then lift each rational prime factor p to its Gaussian-prime
-        form --
-          - p == 2 (ramified):        1+i, appearing to the same power
-                                       p appears in N(z)
-          - p == 3 (mod 4) (inert):   p itself, a Gaussian prime
-          - p == 1 (mod 4) (split):   a+bi and its conjugate a-bi,
-                                       whose individual exponents in z
-                                       are found by direct trial
-                                       division on z (not derivable
-                                       from N(z) alone, since the two
-                                       conjugate primes can divide z to
-                                       different powers)
+        form:
+
+        - p == 2 (ramified): 1+i, appearing to the same power p appears
+          in N(z).
+        - p == 3 (mod 4) (inert): p itself, a Gaussian prime.
+        - p == 1 (mod 4) (split): a+bi and its conjugate a-bi, whose
+          individual exponents in z are found by direct trial division
+          on z (not derivable from N(z) alone, since the two conjugate
+          primes can divide z to different powers).
+
         This is trial division throughout, so it's fine for the sizes
         you'd hit interactively, but isn't meant for cryptographic-size
         inputs.

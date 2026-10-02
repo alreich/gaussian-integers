@@ -6,21 +6,24 @@ real and imaginary parts both happen to be whole numbers transparently
 yields a Zi instead of a Qi (see __new__). This means Qi(4, 6) is
 actually a Zi(4, 6), while Qi(4, '2/3') is a genuine Qi.
 
-Examples:
+Examples
+--------
+
+Exact division of Gaussian integers gives a Gaussian rational:
 
 >>> from gint import Zi, Qi
->>>
 >>> Zi(11, 3) / Zi(1, 8)
->>> # ==> Qi('7/13', '-17/13')
->>>
+Qi('7/13', '-17/13')
 >>> print(Zi(11, 3) / Zi(1, 8))
->>> # ==> (7/13-17/13j)
->>>
+(7/13-17/13j)
+
+Floats are converted to exact fractions, and whole-number parts collapse
+into a ``Zi``:
+
 >>> Qi(2.25, -3.6)
->>> # ==> Qi('9/4', '-18/5')
->>>
+Qi('9/4', '-18/5')
 >>> Qi(2.0, 4)
->>> # ==> Zi(2, 4)
+Zi(2, 4)
 """
 
 import re
@@ -415,8 +418,10 @@ class Qi(Complex):
     @staticmethod
     def gcd(a, b):
         """Greatest common divisor of two Gaussian rationals, generalizing
-        the classic rational-number identity
+        the classic rational-number identity::
+
             gcd(p1/q1, p2/q2) == gcd(p1, p2) / lcm(q1, q2)
+
         to Q(i): clear denominators down to Zi numerators, take Zi.gcd
         of those, and divide by the lcm of the original denominators.
         The defining property -- the one this is tested against -- is
