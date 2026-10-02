@@ -14,7 +14,7 @@ NOTE:
 
 * Zi and Qi both support arithmetic mixed with each other, as well as ints, floats, and complex numbers; including the following operators: `+`, `-`, `*`, `/`, `//`, `**`, `%`, `==`, `!=`, `+=`, `-=`, and `*=`. See the unittests in the tests directory for examples.
 * Python uses $j$ instead of $i$ to represent complex numbers, so $j$ is the default *unit symbol* for Zi and Qi, however, that can be switched to $i$ if desired. Again, see the unittests for examples.
-* Although both **Zi** and **Qi** are subclasses of **numbers.Complex**, and $\mathbb{Z}[i] \subset \mathbb{Q}[i] \subset \mathbb{C}$, the class **Zi** is **not** implemented as a subclass of **Qi**.
+* Although both **Zi** and **Qi** are subclasses of **numbers.Complex**, and (mathematically speaking) $\mathbb{Z}[i] \subset \mathbb{Q}[i] \subset \mathbb{C}$, the class **Zi** is **not** implemented as a subclass of **Qi**.
 * Many of the algorithms and examples here are from ["The Gaussian Integers"](https://kconrad.math.uconn.edu/blurbs/ugradnumthy/Zinotes.pdf) by Keith Conrad
 
 ## Installation
