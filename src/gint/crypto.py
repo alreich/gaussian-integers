@@ -42,7 +42,7 @@ __author__ = "Alfred J. Reich, Ph.D."
 __contact__ = "al.reich@gmail.com"
 __copyright__ = "Copyright (C) 2024 Alfred J. Reich, Ph.D."
 __license__ = "MIT"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 import math
@@ -165,6 +165,14 @@ def generate_keypair(bits: int = 256, e: int = 65537):
     :param e: public exponent. Defaults to 65537, the conventional RSA
         choice.
     :return: a ``(public_key, private_key)`` pair.
+
+    Examples
+    --------
+    >>> public_key, private_key = generate_keypair(bits=64)
+    >>> public_key.e
+    65537
+    >>> public_key.n == private_key.n
+    True
     """
     if bits < 4:
         raise ValueError("bits must be >= 4")
@@ -199,7 +207,18 @@ def _pow_mod(base: Zi, exponent: int, n: int) -> Zi:
 def encrypt_block(m: Zi, public_key: GaussianRSAPublicKey) -> Zi:
     """Encrypt a single message block. `m` must be a Zi with both
     components in [0, public_key.n) -- the canonical representatives of
-    Z[i]/(n) that this module's byte-level encoding produces."""
+    Z[i]/(n) that this module's byte-level encoding produces.
+
+    Examples
+    --------
+    >>> public_key, private_key = generate_keypair(bits=64)
+    >>> m = Zi(123, 456)
+    >>> c = encrypt_block(m, public_key)
+    >>> c != m
+    True
+    >>> decrypt_block(c, private_key) == m
+    True
+    """
     n = public_key.n
     if not (0 <= m.real < n and 0 <= m.imag < n):
         raise ValueError(
@@ -210,7 +229,15 @@ def encrypt_block(m: Zi, public_key: GaussianRSAPublicKey) -> Zi:
 
 def decrypt_block(c: Zi, private_key: GaussianRSAPrivateKey) -> Zi:
     """Decrypt a single ciphertext block, returning the original Zi
-    message block with both components in [0, private_key.n)."""
+    message block with both components in [0, private_key.n).
+
+    Examples
+    --------
+    >>> public_key, private_key = generate_keypair(bits=64)
+    >>> m = Zi(123, 456)
+    >>> decrypt_block(encrypt_block(m, public_key), private_key)
+    Zi(123, 456)
+    """
     n = private_key.n
     m = _pow_mod(c, private_key.d, n)
     return Zi(m.real % n, m.imag % n)
@@ -223,7 +250,13 @@ def decrypt_block(c: Zi, private_key: GaussianRSAPrivateKey) -> Zi:
 def block_capacity(n: int) -> int:
     """Number of bytes safely packed into *each* of a Zi block's two
     components for modulus n, leaving a one-bit safety margin so the
-    resulting integer is always strictly less than n."""
+    resulting integer is always strictly less than n.
+
+    Examples
+    --------
+    >>> block_capacity(2**127)
+    15
+    """
     return max(1, (n.bit_length() - 1) // 8)
 
 
@@ -232,7 +265,15 @@ def encrypt_bytes(data: bytes, public_key: GaussianRSAPublicKey) -> GaussianRSAC
     block packs ``2 * block_capacity(n)`` bytes: the first half becomes
     the real component, the second half the imaginary component. The
     final block is zero-padded; the original length is carried in the
-    returned :class:`GaussianRSACiphertext` so decryption can strip it."""
+    returned :class:`GaussianRSACiphertext` so decryption can strip it.
+
+    Examples
+    --------
+    >>> public_key, private_key = generate_keypair(bits=64)
+    >>> ciphertext = encrypt_bytes(b'hello', public_key)
+    >>> decrypt_bytes(ciphertext, private_key)
+    b'hello'
+    """
     k = block_capacity(public_key.n)
     length = len(data)
     pad_len = (-length) % (2 * k)
@@ -254,6 +295,13 @@ def decrypt_bytes(ciphertext: GaussianRSACiphertext, private_key: GaussianRSAPri
         matching private key this never happens (see block_capacity's
         one-bit safety margin); it signals a key/ciphertext mismatch,
         e.g. decrypting with the wrong private key.
+
+    Examples
+    --------
+    >>> public_key, private_key = generate_keypair(bits=64)
+    >>> data = bytes(range(65, 91))   # any bytes work, not just text
+    >>> decrypt_bytes(encrypt_bytes(data, public_key), private_key)
+    b'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     """
     k = block_capacity(private_key.n)
     out = bytearray()
@@ -272,10 +320,25 @@ def decrypt_bytes(ciphertext: GaussianRSACiphertext, private_key: GaussianRSAPri
 
 def encrypt_text(text: str, public_key: GaussianRSAPublicKey, encoding: str = "utf-8") -> GaussianRSACiphertext:
     """Encrypt a string (UTF-8 by default). Convenience wrapper around
-    :func:`encrypt_bytes`."""
+    :func:`encrypt_bytes`.
+
+    Examples
+    --------
+    >>> public_key, private_key = generate_keypair(bits=64)
+    >>> ciphertext = encrypt_text('Gaussian primes', public_key)
+    >>> decrypt_text(ciphertext, private_key)
+    'Gaussian primes'
+    """
     return encrypt_bytes(text.encode(encoding), public_key)
 
 
 def decrypt_text(ciphertext: GaussianRSACiphertext, private_key: GaussianRSAPrivateKey, encoding: str = "utf-8") -> str:
-    """Inverse of :func:`encrypt_text`."""
+    """Inverse of :func:`encrypt_text`.
+
+    Examples
+    --------
+    >>> public_key, private_key = generate_keypair(bits=64)
+    >>> decrypt_text(encrypt_text('naïve café', public_key), private_key)
+    'naïve café'
+    """
     return decrypt_bytes(ciphertext, private_key).decode(encoding)

@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, os.path.abspath("../../src"))
 
 project = "gint"
-copyright = "2026, Alfred J. Reich"
+copyright = "2024, Alfred J. Reich"
 author = "Alfred J. Reich"
 
 from gint import __version__ as release  # noqa: E402

@@ -1,0 +1,767 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 2226186..9a631ce 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -20,3 +20,5 @@ jobs:
+       - run: python -m pip install --upgrade pip
+       - run: python -m pip install -e ".[test]"
+       - run: python -m pytest -q
++      - name: Run doctests
++        run: python -m pytest -q --doctest-modules src --doctest-glob="*.rst" docs/source/index.rst
+diff --git a/LICENSE b/LICENSE
+index 7004d7a..05fda29 100644
+--- a/LICENSE
++++ b/LICENSE
+@@ -1,6 +1,6 @@
+ MIT License
+ 
+-Copyright (c) 2026 Al Reich
++Copyright (c) 2024 Al Reich
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+diff --git a/docs/source/conf.py b/docs/source/conf.py
+index 4f5b6ea..97e8817 100644
+--- a/docs/source/conf.py
++++ b/docs/source/conf.py
+@@ -8,7 +8,7 @@ import sys
+ sys.path.insert(0, os.path.abspath("../../src"))
+ 
+ project = "gint"
+-copyright = "2026, Alfred J. Reich"
++copyright = "2024, Alfred J. Reich"
+ author = "Alfred J. Reich"
+ 
+ from gint import __version__ as release  # noqa: E402
+diff --git a/src/gint/__init__.py b/src/gint/__init__.py
+index b8176a3..e18fa34 100644
+--- a/src/gint/__init__.py
++++ b/src/gint/__init__.py
+@@ -18,4 +18,4 @@ from . import crypto
+ 
+ __all__ = ["Zi", "Qi", "crypto"]
+ 
+-__version__ = "0.1.0"
++__version__ = "0.2.0"
+diff --git a/src/gint/crypto.py b/src/gint/crypto.py
+index cf31e07..c1dd295 100644
+--- a/src/gint/crypto.py
++++ b/src/gint/crypto.py
+@@ -42,7 +42,7 @@ __author__ = "Alfred J. Reich, Ph.D."
+ __contact__ = "al.reich@gmail.com"
+ __copyright__ = "Copyright (C) 2024 Alfred J. Reich, Ph.D."
+ __license__ = "MIT"
+-__version__ = "0.1.0"
++__version__ = "0.2.0"
+ 
+ 
+ import math
+@@ -165,6 +165,14 @@ def generate_keypair(bits: int = 256, e: int = 65537):
+     :param e: public exponent. Defaults to 65537, the conventional RSA
+         choice.
+     :return: a ``(public_key, private_key)`` pair.
++
++    Examples
++    --------
++    >>> public_key, private_key = generate_keypair(bits=64)
++    >>> public_key.e
++    65537
++    >>> public_key.n == private_key.n
++    True
+     """
+     if bits < 4:
+         raise ValueError("bits must be >= 4")
+@@ -199,7 +207,18 @@ def _pow_mod(base: Zi, exponent: int, n: int) -> Zi:
+ def encrypt_block(m: Zi, public_key: GaussianRSAPublicKey) -> Zi:
+     """Encrypt a single message block. `m` must be a Zi with both
+     components in [0, public_key.n) -- the canonical representatives of
+-    Z[i]/(n) that this module's byte-level encoding produces."""
++    Z[i]/(n) that this module's byte-level encoding produces.
++
++    Examples
++    --------
++    >>> public_key, private_key = generate_keypair(bits=64)
++    >>> m = Zi(123, 456)
++    >>> c = encrypt_block(m, public_key)
++    >>> c != m
++    True
++    >>> decrypt_block(c, private_key) == m
++    True
++    """
+     n = public_key.n
+     if not (0 <= m.real < n and 0 <= m.imag < n):
+         raise ValueError(
+@@ -210,7 +229,15 @@ def encrypt_block(m: Zi, public_key: GaussianRSAPublicKey) -> Zi:
+ 
+ def decrypt_block(c: Zi, private_key: GaussianRSAPrivateKey) -> Zi:
+     """Decrypt a single ciphertext block, returning the original Zi
+-    message block with both components in [0, private_key.n)."""
++    message block with both components in [0, private_key.n).
++
++    Examples
++    --------
++    >>> public_key, private_key = generate_keypair(bits=64)
++    >>> m = Zi(123, 456)
++    >>> decrypt_block(encrypt_block(m, public_key), private_key)
++    Zi(123, 456)
++    """
+     n = private_key.n
+     m = _pow_mod(c, private_key.d, n)
+     return Zi(m.real % n, m.imag % n)
+@@ -223,7 +250,13 @@ def decrypt_block(c: Zi, private_key: GaussianRSAPrivateKey) -> Zi:
+ def block_capacity(n: int) -> int:
+     """Number of bytes safely packed into *each* of a Zi block's two
+     components for modulus n, leaving a one-bit safety margin so the
+-    resulting integer is always strictly less than n."""
++    resulting integer is always strictly less than n.
++
++    Examples
++    --------
++    >>> block_capacity(2**127)
++    15
++    """
+     return max(1, (n.bit_length() - 1) // 8)
+ 
+ 
+@@ -232,7 +265,15 @@ def encrypt_bytes(data: bytes, public_key: GaussianRSAPublicKey) -> GaussianRSAC
+     block packs ``2 * block_capacity(n)`` bytes: the first half becomes
+     the real component, the second half the imaginary component. The
+     final block is zero-padded; the original length is carried in the
+-    returned :class:`GaussianRSACiphertext` so decryption can strip it."""
++    returned :class:`GaussianRSACiphertext` so decryption can strip it.
++
++    Examples
++    --------
++    >>> public_key, private_key = generate_keypair(bits=64)
++    >>> ciphertext = encrypt_bytes(b'hello', public_key)
++    >>> decrypt_bytes(ciphertext, private_key)
++    b'hello'
++    """
+     k = block_capacity(public_key.n)
+     length = len(data)
+     pad_len = (-length) % (2 * k)
+@@ -254,6 +295,13 @@ def decrypt_bytes(ciphertext: GaussianRSACiphertext, private_key: GaussianRSAPri
+         matching private key this never happens (see block_capacity's
+         one-bit safety margin); it signals a key/ciphertext mismatch,
+         e.g. decrypting with the wrong private key.
++
++    Examples
++    --------
++    >>> public_key, private_key = generate_keypair(bits=64)
++    >>> data = bytes(range(65, 91))   # any bytes work, not just text
++    >>> decrypt_bytes(encrypt_bytes(data, public_key), private_key)
++    b'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+     """
+     k = block_capacity(private_key.n)
+     out = bytearray()
+@@ -272,10 +320,25 @@ def decrypt_bytes(ciphertext: GaussianRSACiphertext, private_key: GaussianRSAPri
+ 
+ def encrypt_text(text: str, public_key: GaussianRSAPublicKey, encoding: str = "utf-8") -> GaussianRSACiphertext:
+     """Encrypt a string (UTF-8 by default). Convenience wrapper around
+-    :func:`encrypt_bytes`."""
++    :func:`encrypt_bytes`.
++
++    Examples
++    --------
++    >>> public_key, private_key = generate_keypair(bits=64)
++    >>> ciphertext = encrypt_text('Gaussian primes', public_key)
++    >>> decrypt_text(ciphertext, private_key)
++    'Gaussian primes'
++    """
+     return encrypt_bytes(text.encode(encoding), public_key)
+ 
+ 
+ def decrypt_text(ciphertext: GaussianRSACiphertext, private_key: GaussianRSAPrivateKey, encoding: str = "utf-8") -> str:
+-    """Inverse of :func:`encrypt_text`."""
++    """Inverse of :func:`encrypt_text`.
++
++    Examples
++    --------
++    >>> public_key, private_key = generate_keypair(bits=64)
++    >>> decrypt_text(encrypt_text('naïve café', public_key), private_key)
++    'naïve café'
++    """
+     return decrypt_bytes(ciphertext, private_key).decode(encoding)
+diff --git a/src/gint/qi.py b/src/gint/qi.py
+index f993371..8a645ab 100644
+--- a/src/gint/qi.py
++++ b/src/gint/qi.py
+@@ -43,7 +43,24 @@ __version__ = "0.2.0"
+ 
+ class Qi(Complex):
+     """A class that represents a Gaussian rational: a + bi with a, b in Q,
+-    the set of all rational numbers."""
++    the set of all rational numbers.
++
++    Examples
++    --------
++    >>> a = Qi('1/2', '3/4')
++    >>> a + Qi('1/2', '1/4')    # whole-number parts collapse to a Zi
++    Zi(1, 1)
++    >>> a * a
++    Qi('-5/16', '3/4')
++    >>> a / a
++    Zi(1, 0)
++    >>> a ** -1
++    Qi('8/13', '-12/13')
++    >>> Qi('(1/2-3/5j)')    # strings are parsed
++    Qi('1/2', '-3/5')
++    >>> str(Qi('1/2', '-3/5'))
++    '(1/2-3/5j)'
++    """
+ 
+     __slots__ = ('_real', '_imag')
+ 
+@@ -248,10 +265,24 @@ class Qi(Complex):
+         return self.real != 0 or self.imag != 0
+ 
+     def conjugate(self):
++        """See the examples below.
++
++        Examples
++        --------
++        >>> Qi('1/2', '3/4').conjugate()
++        Qi('1/2', '-3/4')
++        """
+         return Qi(self.real, -self.imag)
+ 
+     @property
+     def norm(self):
++        """The norm N(z) = a**2 + b**2 (the square of the absolute value).
++
++        Examples
++        --------
++        >>> Qi('1/2', '3/4').norm
++        Fraction(13, 16)
++        """
+         return self.real * self.real + self.imag * self.imag
+ 
+     # ---------------- Arithmetic -----------------------------
+@@ -326,7 +357,13 @@ class Qi(Complex):
+         return Qi((c * a + d * b) / denom, (d * a - c * b) / denom)
+ 
+     def inverse(self):
+-        """Returns the exact multiplicative inverse of this Gaussian rational."""
++        """Returns the exact multiplicative inverse of this Gaussian rational.
++
++        Examples
++        --------
++        >>> Qi('1/2', '3/4').inverse()
++        Qi('8/13', '-12/13')
++        """
+         denom = self.real * self.real + self.imag * self.imag
+         if denom == 0:
+             raise ZeroDivisionError("cannot invert zero Gaussian rational")
+@@ -356,12 +393,24 @@ class Qi(Complex):
+     # ---------- Array Conversion ----------
+ 
+     def to_array(self):
+-        """Returns a two-element array representation of this Gaussian rational."""
++        """Returns a two-element array representation of this Gaussian rational.
++
++        Examples
++        --------
++        >>> Qi('1/2', '3/4').to_array()
++        [Fraction(1, 2), Fraction(3, 4)]
++        """
+         return [self.real, self.imag]
+ 
+     @staticmethod
+     def from_array(arr):
+-        """Returns a Gaussian rational, given a two-element array."""
++        """Returns a Gaussian rational, given a two-element array.
++
++        Examples
++        --------
++        >>> Qi.from_array(['1/2', '3/4'])
++        Qi('1/2', '3/4')
++        """
+         if len(arr) != 2:
+             raise ValueError("Array must have exactly two elements")
+         return Qi(arr[0], arr[1])
+@@ -371,21 +420,53 @@ class Qi(Complex):
+     @classmethod
+     def get_unit_symbol(cls):
+         """Forwards to Zi.get_unit_symbol(), the single source of truth
+-        (see the note by __slots__ above)."""
++        (see the note by __slots__ above).
++
++        Examples
++        --------
++        >>> Qi.get_unit_symbol()
++        'j'
++        """
+         return Zi.get_unit_symbol()
+ 
+     @classmethod
+     def set_unit_symbol(cls, symbol):
+         """Forwards to Zi.set_unit_symbol(); setting it on either class
+-        affects both, since they share the same underlying setting."""
++        affects both, since they share the same underlying setting.
++
++        Examples
++        --------
++        >>> Qi.set_unit_symbol('i')
++        >>> print(Qi('1/2', '3/4'))
++        (1/2+3/4i)
++        >>> Qi.set_unit_symbol('j')   # restore the default
++        >>> print(Qi('1/2', '3/4'))
++        (1/2+3/4j)
++        """
+         Zi.set_unit_symbol(symbol)
+ 
+     @classmethod
+     def get_max_denominator(cls):
++        """Return the default cap used by limit_denominator().
++
++        Examples
++        --------
++        >>> Qi.get_max_denominator()
++        1000000
++        """
+         return cls._max_denominator
+ 
+     @classmethod
+     def set_max_denominator(cls, value):
++        """Set the default cap used by limit_denominator().
++
++        Examples
++        --------
++        >>> Qi.set_max_denominator(100)
++        >>> Qi.get_max_denominator()
++        100
++        >>> Qi.set_max_denominator(1_000_000)   # restore the default
++        """
+         if not isinstance(value, int) or value < 1:
+             raise ValueError("max_denominator must be a positive integer")
+         cls._max_denominator = value
+@@ -394,7 +475,16 @@ class Qi(Complex):
+         """Return a new Qi (or Zi, if both parts become whole numbers)
+         with each component approximated by the closest fraction whose
+         denominator does not exceed max_denominator (defaults to
+-        Qi.get_max_denominator())."""
++        Qi.get_max_denominator()).
++
++        Examples
++        --------
++        >>> q = Qi(3.14159, 2.71828)
++        >>> q.limit_denominator(10)
++        Qi('22/7', '19/7')
++        >>> q.limit_denominator(100)
++        Qi('311/99', '193/71')
++        """
+         if max_denominator is None:
+             max_denominator = Qi._max_denominator
+         return Qi(self.real.limit_denominator(max_denominator),
+@@ -429,6 +519,13 @@ class Qi(Complex):
+ 
+         Like Zi.gcd, the result is only defined up to a unit factor.
+         gcd(0, 0) returns 0, matching Zi.gcd's convention.
++
++        Examples
++        --------
++        >>> Qi.gcd(Qi('1/2', 0), Qi('1/3', 0))
++        Qi('1/6', '0')
++        >>> Qi.gcd(Qi('1/2', '1/2'), Qi(1, 0))
++        Qi('1/2', '0')
+         """
+         na, da = Qi._clear_denominator(a)
+         nb, db = Qi._clear_denominator(b)
+@@ -445,6 +542,13 @@ class Qi(Complex):
+         when a, b, c all happen to be Gaussian integers.
+ 
+         Raises ZeroDivisionError if c == 0.
++
++        Examples
++        --------
++        >>> Qi.congruent_modulo(Qi('1/2', '1/2'), Qi('-1/2', '1/2'), Zi(1, 0))
++        True
++        >>> Qi.congruent_modulo(Qi('1/2', '1/2'), Qi('-1/2', '1/2'), Zi(2, 0))
++        False
+         """
+         a = Qi._require_qi(a)
+         b = Qi._require_qi(b)
+@@ -483,6 +587,11 @@ class Qi(Complex):
+         coprimality, zero moduli, mismatched/empty input -- is
+         Zi.crt's to enforce; see its docstring for the algorithm.
+         Returns a Zi, same as Zi.crt.
++
++        Examples
++        --------
++        >>> Qi.crt([Zi(1, 0), Zi(0, 1)], [Zi(1, 2), Zi(3, 0)])
++        Zi(0, -2)
+         """
+         def _as_zi(x, label, plural):
+             v = Qi._require_qi(x)
+diff --git a/src/gint/zi.py b/src/gint/zi.py
+index 06fe8bc..f7a7aac 100644
+--- a/src/gint/zi.py
++++ b/src/gint/zi.py
+@@ -44,7 +44,26 @@ import random as rnd
+ 
+ class Zi(Complex):
+     """A class that represents a Gaussian integer. In mathematics, the set of all integers
+-    is denoted by Z, and the set of all Gaussian integers is denoted by Z[i]."""
++    is denoted by Z, and the set of all Gaussian integers is denoted by Z[i].
++
++    Examples
++    --------
++    >>> a, b = Zi(2, -3), Zi(1, 4)
++    >>> a + b, a - b, a * b
++    (Zi(3, 1), Zi(1, -7), Zi(14, 5))
++    >>> (a * b) / a      # exact division: a Zi when it divides evenly
++    Zi(1, 4)
++    >>> a / b            # ... and a Qi otherwise
++    Qi('-10/17', '-11/17')
++    >>> Zi(7, 24) // Zi(2, 1)    # floor division rounds to the nearest Gaussian integer
++    Zi(8, 8)
++    >>> Zi(7, 24) % Zi(2, 1)
++    Zi(-1, 0)
++    >>> Zi(1, 1) ** 4
++    Zi(-4, 0)
++    >>> Zi(1, 1) ** -1
++    Qi('1/2', '-1/2')
++    """
+ 
+     __slots__ = ('_real', '_imag')
+ 
+@@ -215,10 +234,26 @@ class Zi(Complex):
+         return self.real != 0 or self.imag != 0
+ 
+     def conjugate(self):
++        """See the examples below.
++
++        Examples
++        --------
++        >>> Zi(3, 4).conjugate()
++        Zi(3, -4)
++        >>> Zi(3, 4) * Zi(3, 4).conjugate()   # z * conj(z) == N(z)
++        Zi(25, 0)
++        """
+         return Zi(self._real, -self.imag)
+ 
+     @property
+     def norm(self):
++        """The norm N(z) = a**2 + b**2 (the square of the absolute value).
++
++        Examples
++        --------
++        >>> Zi(3, 4).norm
++        25
++        """
+         return self.real * self.real + self.imag * self.imag
+ 
+     # ---------------- Arithmetic -----------------------------
+@@ -353,16 +388,38 @@ class Zi(Complex):
+         """The exact multiplicative inverse of this Gaussian integer.
+         Returns a Zi if self is a unit, otherwise a Qi. Provided so that
+         inverse() works uniformly on any value coming out of Qi's
+-        arithmetic, since a Qi with denominator 1 collapses into a Zi."""
++        arithmetic, since a Qi with denominator 1 collapses into a Zi.
++
++        Examples
++        --------
++        >>> Zi(0, 1).inverse()      # a unit: the inverse is a Zi
++        Zi(0, -1)
++        >>> Zi(1, 1).inverse()      # not a unit: the inverse is a Qi
++        Qi('1/2', '-1/2')
++        """
+         return Zi(1, 0) / self
+ 
+     # ---------- Array Conversion ----------
+ 
+     def to_array(self):
++        """Return the real and imaginary parts as a two-element list.
++
++        Examples
++        --------
++        >>> Zi(3, 4).to_array()
++        [3, 4]
++        """
+         return [self.real, self.imag]
+ 
+     @staticmethod
+     def from_array(arr):
++        """Return a Gaussian integer, given a two-element array.
++
++        Examples
++        --------
++        >>> Zi.from_array([3, 4])
++        Zi(3, 4)
++        """
+         if len(arr) != 2:
+             raise ValueError("Array must have exactly two elements")
+         return Zi(arr[0], arr[1])
+@@ -397,6 +454,11 @@ class Zi(Complex):
+           a rational prime with c % 4 == 3 (primes p == 2 or p == 1 mod 4
+           are NOT Gaussian primes: 2 ramifies as -i(1+i)^2, and p == 1 mod 4
+           splits into two conjugate Gaussian primes).
++
++        Examples
++        --------
++        >>> [Zi.is_gaussian_prime(Zi(*t)) for t in [(3, 0), (2, 0), (2, 1), (1, 12), (0, 3)]]
++        [True, False, True, False, True]
+         """
+         if isinstance(x, Zi):
+             a, b = x.real, x.imag
+@@ -425,6 +487,17 @@ class Zi(Complex):
+         a = b * q + r. This is what makes gcd/xgcd below terminate
+         correctly, since Z[i] is a Euclidean domain under the norm
+         only when division rounds to nearest.
++
++        Examples
++        --------
++        >>> a, b = Zi(27, -23), Zi(8, 1)
++        >>> q, r = Zi.modified_divmod(a, b)
++        >>> q, r
++        (Zi(3, -3), Zi(0, -2))
++        >>> b * q + r == a
++        True
++        >>> r.norm < b.norm
++        True
+         """
+         a = Zi._require_zi(a)
+         b = Zi._require_zi(b)
+@@ -440,6 +513,14 @@ class Zi(Complex):
+         Returns the greatest common divisor of a & b.
+ 
+         This function implements the Euclidean algorithm for Gaussian integers.
++
++        Examples
++        --------
++        >>> g = Zi.gcd(Zi(11, 3), Zi(1, 8))
++        >>> g
++        Zi(1, -2)
++        >>> Zi.is_associate(g, Zi(2, 1))   # the gcd is only defined up to a unit
++        True
+         """
+         a = Zi._require_zi(a)
+         b = Zi._require_zi(b)
+@@ -451,7 +532,16 @@ class Zi(Complex):
+     @staticmethod
+     def xgcd(a, b):
+         """Extended Euclidean algorithm. Returns (g, s, t) such that
+-        a*s + b*t == g == gcd(a, b) (up to a unit factor)."""
++        a*s + b*t == g == gcd(a, b) (up to a unit factor).
++
++        Examples
++        --------
++        >>> g, s, t = Zi.xgcd(Zi(11, 3), Zi(1, 8))
++        >>> g, s, t
++        (Zi(1, -2), Zi(2, -1), Zi(0, 3))
++        >>> Zi(11, 3) * s + Zi(1, 8) * t == g
++        True
++        """
+         a = Zi._require_zi(a)
+         b = Zi._require_zi(b)
+         old_r, r = a, b
+@@ -471,7 +561,15 @@ class Zi(Complex):
+         associates generate the same ideal and share the same
+         factorization up to units, e.g. this is why gcd/xgcd only
+         determine their result up to a unit. By convention, 0 is only
+-        an associate of itself."""
++        an associate of itself.
++
++        Examples
++        --------
++        >>> Zi.is_associate(Zi(1, 1), Zi(-1, 1))   # (-1+1j) == 1j * (1+1j)
++        True
++        >>> Zi.is_associate(Zi(1, 1), Zi(1, 2))
++        False
++        """
+         a = Zi._require_zi(a)
+         b = Zi._require_zi(b)
+         if a == Zi(0, 0) or b == Zi(0, 0):
+@@ -482,13 +580,29 @@ class Zi(Complex):
+     def is_coprime(a, b):
+         """True iff gcd(a, b) is a unit, i.e., a and b share no common
+         Gaussian-prime factor. Follows the gcd(0, 0) == 0 convention,
+-        so is_coprime(0, 0) is False (0 is not a unit)."""
++        so is_coprime(0, 0) is False (0 is not a unit).
++
++        Examples
++        --------
++        >>> Zi.is_coprime(Zi(2, 1), Zi(1, 2))
++        True
++        >>> Zi.is_coprime(Zi(1, 1), Zi(2, 0))   # both divisible by 1+1j
++        False
++        """
+         return Zi.gcd(a, b).is_unit
+ 
+     @staticmethod
+     def divides(a, b):
+         """True iff a divides b exactly (there exists a Gaussian integer
+-        q with b == a*q). By convention, 0 divides only 0."""
++        q with b == a*q). By convention, 0 divides only 0.
++
++        Examples
++        --------
++        >>> Zi.divides(Zi(1, 1), Zi(2, 0))
++        True
++        >>> Zi.divides(Zi(2, 0), Zi(1, 1))
++        False
++        """
+         a = Zi._require_zi(a)
+         b = Zi._require_zi(b)
+         if a == Zi(0, 0):
+@@ -501,7 +615,16 @@ class Zi(Complex):
+         a*b // gcd(a, b) (exact, since gcd always divides a*b evenly).
+         Like gcd, this is only well-defined up to multiplication by a
+         unit, Z[i] has four units, so 'the' lcm isn't unique, just as
+-        'the' gcd isn't."""
++        'the' gcd isn't.
++
++        Examples
++        --------
++        >>> m = Zi.lcm(Zi(1, 1), Zi(2, 1))
++        >>> m
++        Zi(-1, -3)
++        >>> Zi.is_associate(m, Zi(1, 1) * Zi(2, 1))   # the factors are coprime
++        True
++        """
+         a = Zi._require_zi(a)
+         b = Zi._require_zi(b)
+         if a == Zi(0, 0) or b == Zi(0, 0):
+@@ -514,6 +637,13 @@ class Zi(Complex):
+         """True iff a is congruent to b modulo c, i.e., iff c divides (a - b).
+         Raises ZeroDivisionError if c == Zi(0, 0), via the underlying %
+         operator (same behavior as gcd/xgcd on a zero modulus).
++
++        Examples
++        --------
++        >>> Zi.congruent_modulo(Zi(1, 12), Zi(2, -1), Zi(3, 1))
++        True
++        >>> Zi.congruent_modulo(Zi(1, 12), Zi(2, -1), Zi(2, 0))
++        False
+         """
+         a = Zi._require_zi(a)
+         b = Zi._require_zi(b)
+@@ -557,6 +687,16 @@ class Zi(Complex):
+         Z[i] is a UFD, can only happen if it shares a common
+         non-unit factor with one of them individually.) Raises
+         ZeroDivisionError if any modulus is zero.
++
++        Examples
++        --------
++        >>> residues = [Zi(1, 0), Zi(0, 1)]
++        >>> moduli = [Zi(1, 2), Zi(3, 0)]
++        >>> x = Zi.crt(residues, moduli)
++        >>> x
++        Zi(0, -2)
++        >>> [Zi.congruent_modulo(x, r, m) for r, m in zip(residues, moduli)]
++        [True, True]
+         """
+         residues = [Zi._require_zi(r) for r in residues]
+         moduli = [Zi._require_zi(m) for m in moduli]
+@@ -619,6 +759,19 @@ class Zi(Complex):
+         This is trial division throughout, so it's fine for the sizes
+         you'd hit interactively, but isn't meant for cryptographic-size
+         inputs.
++
++        Examples
++        --------
++        >>> unit, factors = Zi.factor(Zi(10, 0))
++        >>> unit
++        Zi(0, -1)
++        >>> factors
++        [(Zi(1, 1), 2), (Zi(1, 2), 1), (Zi(1, -2), 1)]
++        >>> z = unit
++        >>> for p, e in factors:
++        ...     z *= p ** e
++        >>> z
++        Zi(10, 0)
+         """
+         z = Zi._require_zi(z)
+         if z == Zi(0, 0):
+@@ -668,10 +821,28 @@ class Zi(Complex):
+ 
+     @classmethod
+     def get_unit_symbol(cls):
++        """Return the imaginary-unit symbol used by str() (default ``j``).
++
++        Examples
++        --------
++        >>> Zi.get_unit_symbol()
++        'j'
++        """
+         return cls._unit_symbol
+ 
+     @classmethod
+     def set_unit_symbol(cls, symbol):
++        """Set the imaginary-unit symbol used by str(): ``'j'`` (default) or ``'i'``.
++
++        Examples
++        --------
++        >>> Zi.set_unit_symbol('i')
++        >>> print(Zi(2, -3))
++        (2-3i)
++        >>> Zi.set_unit_symbol('j')   # restore the default
++        >>> print(Zi(2, -3))
++        (2-3j)
++        """
+         if symbol not in ('i', 'j'):
+             raise ValueError("unit symbol must be 'i' or 'j'")
+         cls._unit_symbol = symbol
+@@ -680,6 +851,13 @@ class Zi(Complex):
+ 
+     @staticmethod
+     def random(re_min=-100, re_max=100, im_min=None, im_max=None):
++        """Return a random Gaussian integer with real part in [re_min, re_max] and imaginary part in [im_min, im_max] (im_min and im_max default to re_min and re_max).
++
++        Examples
++        --------
++        >>> -5 <= Zi.random(-5, 5).real <= 5
++        True
++        """
+         if im_min is None:
+             im_min = re_min
+         if im_max is None:
+@@ -688,18 +866,47 @@ class Zi(Complex):
+ 
+     @staticmethod
+     def eye():
++        """Return the imaginary unit i.
++
++        Examples
++        --------
++        >>> Zi.eye()
++        Zi(0, 1)
++        """
+         return Zi(0, 1)
+ 
+     @staticmethod
+     def units():
++        """Return the four units of Z[i]: 1, -1, i and -i.
++
++        Examples
++        --------
++        >>> Zi.units()
++        [Zi(1, 0), Zi(-1, 0), Zi(0, 1), Zi(0, -1)]
++        """
+         return [Zi(1), -Zi(1), Zi.eye(), -Zi.eye()]
+ 
+     @property
+     def is_unit(self):
+         """A Gaussian integer is a unit iff it has norm 1 (equivalent to,
+-        but cheaper than, checking membership in Zi.units())."""
++        but cheaper than, checking membership in Zi.units()).
++
++        Examples
++        --------
++        >>> Zi(0, 1).is_unit
++        True
++        >>> Zi(1, 1).is_unit
++        False
++        """
+         return self.norm == 1
+ 
+     @staticmethod
+     def two():
++        """Return 1+i, the Gaussian prime whose norm is 2.
++
++        Examples
++        --------
++        >>> Zi.two()   # 1+1j, the Gaussian prime of norm 2
++        Zi(1, 1)
++        """
+         return Zi(1, 1)

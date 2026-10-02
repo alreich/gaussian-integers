@@ -44,7 +44,26 @@ import random as rnd
 
 class Zi(Complex):
     """A class that represents a Gaussian integer. In mathematics, the set of all integers
-    is denoted by Z, and the set of all Gaussian integers is denoted by Z[i]."""
+    is denoted by Z, and the set of all Gaussian integers is denoted by Z[i].
+
+    Examples
+    --------
+    >>> a, b = Zi(2, -3), Zi(1, 4)
+    >>> a + b, a - b, a * b
+    (Zi(3, 1), Zi(1, -7), Zi(14, 5))
+    >>> (a * b) / a      # exact division: a Zi when it divides evenly
+    Zi(1, 4)
+    >>> a / b            # ... and a Qi otherwise
+    Qi('-10/17', '-11/17')
+    >>> Zi(7, 24) // Zi(2, 1)    # floor division rounds to the nearest Gaussian integer
+    Zi(8, 8)
+    >>> Zi(7, 24) % Zi(2, 1)
+    Zi(-1, 0)
+    >>> Zi(1, 1) ** 4
+    Zi(-4, 0)
+    >>> Zi(1, 1) ** -1
+    Qi('1/2', '-1/2')
+    """
 
     __slots__ = ('_real', '_imag')
 
@@ -215,10 +234,26 @@ class Zi(Complex):
         return self.real != 0 or self.imag != 0
 
     def conjugate(self):
+        """See the examples below.
+
+        Examples
+        --------
+        >>> Zi(3, 4).conjugate()
+        Zi(3, -4)
+        >>> Zi(3, 4) * Zi(3, 4).conjugate()   # z * conj(z) == N(z)
+        Zi(25, 0)
+        """
         return Zi(self._real, -self.imag)
 
     @property
     def norm(self):
+        """The norm N(z) = a**2 + b**2 (the square of the absolute value).
+
+        Examples
+        --------
+        >>> Zi(3, 4).norm
+        25
+        """
         return self.real * self.real + self.imag * self.imag
 
     # ---------------- Arithmetic -----------------------------
@@ -353,16 +388,38 @@ class Zi(Complex):
         """The exact multiplicative inverse of this Gaussian integer.
         Returns a Zi if self is a unit, otherwise a Qi. Provided so that
         inverse() works uniformly on any value coming out of Qi's
-        arithmetic, since a Qi with denominator 1 collapses into a Zi."""
+        arithmetic, since a Qi with denominator 1 collapses into a Zi.
+
+        Examples
+        --------
+        >>> Zi(0, 1).inverse()      # a unit: the inverse is a Zi
+        Zi(0, -1)
+        >>> Zi(1, 1).inverse()      # not a unit: the inverse is a Qi
+        Qi('1/2', '-1/2')
+        """
         return Zi(1, 0) / self
 
     # ---------- Array Conversion ----------
 
     def to_array(self):
+        """Return the real and imaginary parts as a two-element list.
+
+        Examples
+        --------
+        >>> Zi(3, 4).to_array()
+        [3, 4]
+        """
         return [self.real, self.imag]
 
     @staticmethod
     def from_array(arr):
+        """Return a Gaussian integer, given a two-element array.
+
+        Examples
+        --------
+        >>> Zi.from_array([3, 4])
+        Zi(3, 4)
+        """
         if len(arr) != 2:
             raise ValueError("Array must have exactly two elements")
         return Zi(arr[0], arr[1])
@@ -397,6 +454,11 @@ class Zi(Complex):
           a rational prime with c % 4 == 3 (primes p == 2 or p == 1 mod 4
           are NOT Gaussian primes: 2 ramifies as -i(1+i)^2, and p == 1 mod 4
           splits into two conjugate Gaussian primes).
+
+        Examples
+        --------
+        >>> [Zi.is_gaussian_prime(Zi(*t)) for t in [(3, 0), (2, 0), (2, 1), (1, 12), (0, 3)]]
+        [True, False, True, False, True]
         """
         if isinstance(x, Zi):
             a, b = x.real, x.imag
@@ -425,6 +487,17 @@ class Zi(Complex):
         a = b * q + r. This is what makes gcd/xgcd below terminate
         correctly, since Z[i] is a Euclidean domain under the norm
         only when division rounds to nearest.
+
+        Examples
+        --------
+        >>> a, b = Zi(27, -23), Zi(8, 1)
+        >>> q, r = Zi.modified_divmod(a, b)
+        >>> q, r
+        (Zi(3, -3), Zi(0, -2))
+        >>> b * q + r == a
+        True
+        >>> r.norm < b.norm
+        True
         """
         a = Zi._require_zi(a)
         b = Zi._require_zi(b)
@@ -440,6 +513,14 @@ class Zi(Complex):
         Returns the greatest common divisor of a & b.
 
         This function implements the Euclidean algorithm for Gaussian integers.
+
+        Examples
+        --------
+        >>> g = Zi.gcd(Zi(11, 3), Zi(1, 8))
+        >>> g
+        Zi(1, -2)
+        >>> Zi.is_associate(g, Zi(2, 1))   # the gcd is only defined up to a unit
+        True
         """
         a = Zi._require_zi(a)
         b = Zi._require_zi(b)
@@ -451,7 +532,16 @@ class Zi(Complex):
     @staticmethod
     def xgcd(a, b):
         """Extended Euclidean algorithm. Returns (g, s, t) such that
-        a*s + b*t == g == gcd(a, b) (up to a unit factor)."""
+        a*s + b*t == g == gcd(a, b) (up to a unit factor).
+
+        Examples
+        --------
+        >>> g, s, t = Zi.xgcd(Zi(11, 3), Zi(1, 8))
+        >>> g, s, t
+        (Zi(1, -2), Zi(2, -1), Zi(0, 3))
+        >>> Zi(11, 3) * s + Zi(1, 8) * t == g
+        True
+        """
         a = Zi._require_zi(a)
         b = Zi._require_zi(b)
         old_r, r = a, b
@@ -471,7 +561,15 @@ class Zi(Complex):
         associates generate the same ideal and share the same
         factorization up to units, e.g. this is why gcd/xgcd only
         determine their result up to a unit. By convention, 0 is only
-        an associate of itself."""
+        an associate of itself.
+
+        Examples
+        --------
+        >>> Zi.is_associate(Zi(1, 1), Zi(-1, 1))   # (-1+1j) == 1j * (1+1j)
+        True
+        >>> Zi.is_associate(Zi(1, 1), Zi(1, 2))
+        False
+        """
         a = Zi._require_zi(a)
         b = Zi._require_zi(b)
         if a == Zi(0, 0) or b == Zi(0, 0):
@@ -482,13 +580,29 @@ class Zi(Complex):
     def is_coprime(a, b):
         """True iff gcd(a, b) is a unit, i.e., a and b share no common
         Gaussian-prime factor. Follows the gcd(0, 0) == 0 convention,
-        so is_coprime(0, 0) is False (0 is not a unit)."""
+        so is_coprime(0, 0) is False (0 is not a unit).
+
+        Examples
+        --------
+        >>> Zi.is_coprime(Zi(2, 1), Zi(1, 2))
+        True
+        >>> Zi.is_coprime(Zi(1, 1), Zi(2, 0))   # both divisible by 1+1j
+        False
+        """
         return Zi.gcd(a, b).is_unit
 
     @staticmethod
     def divides(a, b):
         """True iff a divides b exactly (there exists a Gaussian integer
-        q with b == a*q). By convention, 0 divides only 0."""
+        q with b == a*q). By convention, 0 divides only 0.
+
+        Examples
+        --------
+        >>> Zi.divides(Zi(1, 1), Zi(2, 0))
+        True
+        >>> Zi.divides(Zi(2, 0), Zi(1, 1))
+        False
+        """
         a = Zi._require_zi(a)
         b = Zi._require_zi(b)
         if a == Zi(0, 0):
@@ -501,7 +615,16 @@ class Zi(Complex):
         a*b // gcd(a, b) (exact, since gcd always divides a*b evenly).
         Like gcd, this is only well-defined up to multiplication by a
         unit, Z[i] has four units, so 'the' lcm isn't unique, just as
-        'the' gcd isn't."""
+        'the' gcd isn't.
+
+        Examples
+        --------
+        >>> m = Zi.lcm(Zi(1, 1), Zi(2, 1))
+        >>> m
+        Zi(-1, -3)
+        >>> Zi.is_associate(m, Zi(1, 1) * Zi(2, 1))   # the factors are coprime
+        True
+        """
         a = Zi._require_zi(a)
         b = Zi._require_zi(b)
         if a == Zi(0, 0) or b == Zi(0, 0):
@@ -514,6 +637,13 @@ class Zi(Complex):
         """True iff a is congruent to b modulo c, i.e., iff c divides (a - b).
         Raises ZeroDivisionError if c == Zi(0, 0), via the underlying %
         operator (same behavior as gcd/xgcd on a zero modulus).
+
+        Examples
+        --------
+        >>> Zi.congruent_modulo(Zi(1, 12), Zi(2, -1), Zi(3, 1))
+        True
+        >>> Zi.congruent_modulo(Zi(1, 12), Zi(2, -1), Zi(2, 0))
+        False
         """
         a = Zi._require_zi(a)
         b = Zi._require_zi(b)
@@ -557,6 +687,16 @@ class Zi(Complex):
         Z[i] is a UFD, can only happen if it shares a common
         non-unit factor with one of them individually.) Raises
         ZeroDivisionError if any modulus is zero.
+
+        Examples
+        --------
+        >>> residues = [Zi(1, 0), Zi(0, 1)]
+        >>> moduli = [Zi(1, 2), Zi(3, 0)]
+        >>> x = Zi.crt(residues, moduli)
+        >>> x
+        Zi(0, -2)
+        >>> [Zi.congruent_modulo(x, r, m) for r, m in zip(residues, moduli)]
+        [True, True]
         """
         residues = [Zi._require_zi(r) for r in residues]
         moduli = [Zi._require_zi(m) for m in moduli]
@@ -619,6 +759,19 @@ class Zi(Complex):
         This is trial division throughout, so it's fine for the sizes
         you'd hit interactively, but isn't meant for cryptographic-size
         inputs.
+
+        Examples
+        --------
+        >>> unit, factors = Zi.factor(Zi(10, 0))
+        >>> unit
+        Zi(0, -1)
+        >>> factors
+        [(Zi(1, 1), 2), (Zi(1, 2), 1), (Zi(1, -2), 1)]
+        >>> z = unit
+        >>> for p, e in factors:
+        ...     z *= p ** e
+        >>> z
+        Zi(10, 0)
         """
         z = Zi._require_zi(z)
         if z == Zi(0, 0):
@@ -668,10 +821,28 @@ class Zi(Complex):
 
     @classmethod
     def get_unit_symbol(cls):
+        """Return the imaginary-unit symbol used by str() (default ``j``).
+
+        Examples
+        --------
+        >>> Zi.get_unit_symbol()
+        'j'
+        """
         return cls._unit_symbol
 
     @classmethod
     def set_unit_symbol(cls, symbol):
+        """Set the imaginary-unit symbol used by str(): ``'j'`` (default) or ``'i'``.
+
+        Examples
+        --------
+        >>> Zi.set_unit_symbol('i')
+        >>> print(Zi(2, -3))
+        (2-3i)
+        >>> Zi.set_unit_symbol('j')   # restore the default
+        >>> print(Zi(2, -3))
+        (2-3j)
+        """
         if symbol not in ('i', 'j'):
             raise ValueError("unit symbol must be 'i' or 'j'")
         cls._unit_symbol = symbol
@@ -680,6 +851,13 @@ class Zi(Complex):
 
     @staticmethod
     def random(re_min=-100, re_max=100, im_min=None, im_max=None):
+        """Return a random Gaussian integer with real part in [re_min, re_max] and imaginary part in [im_min, im_max] (im_min and im_max default to re_min and re_max).
+
+        Examples
+        --------
+        >>> -5 <= Zi.random(-5, 5).real <= 5
+        True
+        """
         if im_min is None:
             im_min = re_min
         if im_max is None:
@@ -688,18 +866,47 @@ class Zi(Complex):
 
     @staticmethod
     def eye():
+        """Return the imaginary unit i.
+
+        Examples
+        --------
+        >>> Zi.eye()
+        Zi(0, 1)
+        """
         return Zi(0, 1)
 
     @staticmethod
     def units():
+        """Return the four units of Z[i]: 1, -1, i and -i.
+
+        Examples
+        --------
+        >>> Zi.units()
+        [Zi(1, 0), Zi(-1, 0), Zi(0, 1), Zi(0, -1)]
+        """
         return [Zi(1), -Zi(1), Zi.eye(), -Zi.eye()]
 
     @property
     def is_unit(self):
         """A Gaussian integer is a unit iff it has norm 1 (equivalent to,
-        but cheaper than, checking membership in Zi.units())."""
+        but cheaper than, checking membership in Zi.units()).
+
+        Examples
+        --------
+        >>> Zi(0, 1).is_unit
+        True
+        >>> Zi(1, 1).is_unit
+        False
+        """
         return self.norm == 1
 
     @staticmethod
     def two():
+        """Return 1+i, the Gaussian prime whose norm is 2.
+
+        Examples
+        --------
+        >>> Zi.two()   # 1+1j, the Gaussian prime of norm 2
+        Zi(1, 1)
+        """
         return Zi(1, 1)

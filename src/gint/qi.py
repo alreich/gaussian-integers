@@ -43,7 +43,24 @@ __version__ = "0.2.0"
 
 class Qi(Complex):
     """A class that represents a Gaussian rational: a + bi with a, b in Q,
-    the set of all rational numbers."""
+    the set of all rational numbers.
+
+    Examples
+    --------
+    >>> a = Qi('1/2', '3/4')
+    >>> a + Qi('1/2', '1/4')    # whole-number parts collapse to a Zi
+    Zi(1, 1)
+    >>> a * a
+    Qi('-5/16', '3/4')
+    >>> a / a
+    Zi(1, 0)
+    >>> a ** -1
+    Qi('8/13', '-12/13')
+    >>> Qi('(1/2-3/5j)')    # strings are parsed
+    Qi('1/2', '-3/5')
+    >>> str(Qi('1/2', '-3/5'))
+    '(1/2-3/5j)'
+    """
 
     __slots__ = ('_real', '_imag')
 
@@ -248,10 +265,24 @@ class Qi(Complex):
         return self.real != 0 or self.imag != 0
 
     def conjugate(self):
+        """See the examples below.
+
+        Examples
+        --------
+        >>> Qi('1/2', '3/4').conjugate()
+        Qi('1/2', '-3/4')
+        """
         return Qi(self.real, -self.imag)
 
     @property
     def norm(self):
+        """The norm N(z) = a**2 + b**2 (the square of the absolute value).
+
+        Examples
+        --------
+        >>> Qi('1/2', '3/4').norm
+        Fraction(13, 16)
+        """
         return self.real * self.real + self.imag * self.imag
 
     # ---------------- Arithmetic -----------------------------
@@ -326,7 +357,13 @@ class Qi(Complex):
         return Qi((c * a + d * b) / denom, (d * a - c * b) / denom)
 
     def inverse(self):
-        """Returns the exact multiplicative inverse of this Gaussian rational."""
+        """Returns the exact multiplicative inverse of this Gaussian rational.
+
+        Examples
+        --------
+        >>> Qi('1/2', '3/4').inverse()
+        Qi('8/13', '-12/13')
+        """
         denom = self.real * self.real + self.imag * self.imag
         if denom == 0:
             raise ZeroDivisionError("cannot invert zero Gaussian rational")
@@ -356,12 +393,24 @@ class Qi(Complex):
     # ---------- Array Conversion ----------
 
     def to_array(self):
-        """Returns a two-element array representation of this Gaussian rational."""
+        """Returns a two-element array representation of this Gaussian rational.
+
+        Examples
+        --------
+        >>> Qi('1/2', '3/4').to_array()
+        [Fraction(1, 2), Fraction(3, 4)]
+        """
         return [self.real, self.imag]
 
     @staticmethod
     def from_array(arr):
-        """Returns a Gaussian rational, given a two-element array."""
+        """Returns a Gaussian rational, given a two-element array.
+
+        Examples
+        --------
+        >>> Qi.from_array(['1/2', '3/4'])
+        Qi('1/2', '3/4')
+        """
         if len(arr) != 2:
             raise ValueError("Array must have exactly two elements")
         return Qi(arr[0], arr[1])
@@ -371,21 +420,53 @@ class Qi(Complex):
     @classmethod
     def get_unit_symbol(cls):
         """Forwards to Zi.get_unit_symbol(), the single source of truth
-        (see the note by __slots__ above)."""
+        (see the note by __slots__ above).
+
+        Examples
+        --------
+        >>> Qi.get_unit_symbol()
+        'j'
+        """
         return Zi.get_unit_symbol()
 
     @classmethod
     def set_unit_symbol(cls, symbol):
         """Forwards to Zi.set_unit_symbol(); setting it on either class
-        affects both, since they share the same underlying setting."""
+        affects both, since they share the same underlying setting.
+
+        Examples
+        --------
+        >>> Qi.set_unit_symbol('i')
+        >>> print(Qi('1/2', '3/4'))
+        (1/2+3/4i)
+        >>> Qi.set_unit_symbol('j')   # restore the default
+        >>> print(Qi('1/2', '3/4'))
+        (1/2+3/4j)
+        """
         Zi.set_unit_symbol(symbol)
 
     @classmethod
     def get_max_denominator(cls):
+        """Return the default cap used by limit_denominator().
+
+        Examples
+        --------
+        >>> Qi.get_max_denominator()
+        1000000
+        """
         return cls._max_denominator
 
     @classmethod
     def set_max_denominator(cls, value):
+        """Set the default cap used by limit_denominator().
+
+        Examples
+        --------
+        >>> Qi.set_max_denominator(100)
+        >>> Qi.get_max_denominator()
+        100
+        >>> Qi.set_max_denominator(1_000_000)   # restore the default
+        """
         if not isinstance(value, int) or value < 1:
             raise ValueError("max_denominator must be a positive integer")
         cls._max_denominator = value
@@ -394,7 +475,16 @@ class Qi(Complex):
         """Return a new Qi (or Zi, if both parts become whole numbers)
         with each component approximated by the closest fraction whose
         denominator does not exceed max_denominator (defaults to
-        Qi.get_max_denominator())."""
+        Qi.get_max_denominator()).
+
+        Examples
+        --------
+        >>> q = Qi(3.14159, 2.71828)
+        >>> q.limit_denominator(10)
+        Qi('22/7', '19/7')
+        >>> q.limit_denominator(100)
+        Qi('311/99', '193/71')
+        """
         if max_denominator is None:
             max_denominator = Qi._max_denominator
         return Qi(self.real.limit_denominator(max_denominator),
@@ -429,6 +519,13 @@ class Qi(Complex):
 
         Like Zi.gcd, the result is only defined up to a unit factor.
         gcd(0, 0) returns 0, matching Zi.gcd's convention.
+
+        Examples
+        --------
+        >>> Qi.gcd(Qi('1/2', 0), Qi('1/3', 0))
+        Qi('1/6', '0')
+        >>> Qi.gcd(Qi('1/2', '1/2'), Qi(1, 0))
+        Qi('1/2', '0')
         """
         na, da = Qi._clear_denominator(a)
         nb, db = Qi._clear_denominator(b)
@@ -445,6 +542,13 @@ class Qi(Complex):
         when a, b, c all happen to be Gaussian integers.
 
         Raises ZeroDivisionError if c == 0.
+
+        Examples
+        --------
+        >>> Qi.congruent_modulo(Qi('1/2', '1/2'), Qi('-1/2', '1/2'), Zi(1, 0))
+        True
+        >>> Qi.congruent_modulo(Qi('1/2', '1/2'), Qi('-1/2', '1/2'), Zi(2, 0))
+        False
         """
         a = Qi._require_qi(a)
         b = Qi._require_qi(b)
@@ -483,6 +587,11 @@ class Qi(Complex):
         coprimality, zero moduli, mismatched/empty input -- is
         Zi.crt's to enforce; see its docstring for the algorithm.
         Returns a Zi, same as Zi.crt.
+
+        Examples
+        --------
+        >>> Qi.crt([Zi(1, 0), Zi(0, 1)], [Zi(1, 2), Zi(3, 0)])
+        Zi(0, -2)
         """
         def _as_zi(x, label, plural):
             v = Qi._require_qi(x)

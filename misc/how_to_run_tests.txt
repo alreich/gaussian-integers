@@ -1,0 +1,7 @@
+How to run tests.txt
+
+python -m pytest
+
+and
+
+python -m pytest -q --doctest-modules src --doctest-glob="*.rst" docs/source/index.rst

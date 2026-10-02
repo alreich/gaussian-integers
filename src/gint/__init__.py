@@ -18,4 +18,4 @@ from . import crypto
 
 __all__ = ["Zi", "Qi", "crypto"]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
