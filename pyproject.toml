@@ -1,35 +1,46 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "gint"
-version = "0.1.0"
-description = "Gaussian integers (Zi) and Gaussian rationals (Qi)"
+dynamic = ["version"]   # single source of truth: gint.__version__ in src/gint/__init__.py
+description = "Gaussian integers (Zi), Gaussian rationals (Qi), and Gaussian-integer RSA (crypto)"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Alfred J. Reich" }]
-keywords = ["gaussian integers", "gaussian rationals", "number theory", "complex numbers"]
+keywords = [
+    "gaussian integers", "gaussian rationals", "gaussian primes",
+    "number theory", "complex numbers", "rsa", "cryptography",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Education",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Security :: Cryptography",
 ]
 
 [project.optional-dependencies]
 test = ["pytest"]
-docs = ["sphinx", "sphinx-rtd-theme"]
+docs = ["sphinx>=7", "sphinx-rtd-theme>=2"]
 
 [project.urls]
-Homepage = "https://github.com/alreich/gint-project"
+Homepage = "https://github.com/alreich/gaussian-integers"
+Repository = "https://github.com/alreich/gaussian-integers"
+Issues = "https://github.com/alreich/gaussian-integers/issues"
 Documentation = "https://gint-project.readthedocs.io"
 
 # --- src layout: tell setuptools the package lives under src/ ---
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "gint.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

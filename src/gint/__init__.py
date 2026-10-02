@@ -8,7 +8,7 @@
 
 Zi represent a Gaussian integer and Qi represents a Gaussian rational
 (a complex number with rational real and imaginary components).
-A Qi ransparently collapses to a Zi whenever both components are whole
+A Qi transparently collapses to a Zi whenever both components are whole
 numbers, e.g. Qi(4, 6) is a Zi(4, 6).
 """
 
